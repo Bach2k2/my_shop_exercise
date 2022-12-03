@@ -6,16 +6,17 @@ import com.example.my_shop_exercise.model.entity.CategoryEntity;
 import com.example.my_shop_exercise.model.entity.ProductEntity;
 import com.google.protobuf.TextFormat;
 
-
 import javax.servlet.ServletException;
 import javax.servlet.annotation.MultipartConfig;
 import javax.servlet.annotation.WebServlet;
-import javax.servlet.http.*;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import javax.servlet.http.HttpSession;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-
 import java.util.List;
 
 @MultipartConfig
@@ -27,6 +28,7 @@ public class ProductServlet extends HttpServlet {
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
         response.setContentType("text/html;charset=UTF-8");
+        request.setCharacterEncoding("utf-8");
         HttpSession session = request.getSession();
         String username = null, password = null;
         if (session.getAttribute("username") != null) {
@@ -36,30 +38,42 @@ public class ProductServlet extends HttpServlet {
             password = session.getAttribute("password").toString();
         }
         System.out.println("username= " + username);
-        String action = null;
-        if (loginBo.isLogin(username, password)) {
-            showHome(request, response);
-        } else {
-            // response.sendRedirect("/login.jsp");
-            showLoginForm(request, response);
-        }
+//        if (loginBo.isLogin(username, password)) {
+//            showHome(request, response);
+//        } else {
+//            // response.sendRedirect("/login.jsp");
+//            showLoginForm(request, response);
+//        }
 
-        action = request.getParameter("action");
+        String action = request.getParameter("action");
         if (action == null) {
             action = "";
         }
+        System.out.println(action);
         switch (action) {
             case "get":
                 showProductList(request, response);
                 break;
             case "add":
-                showInsertForm(request, response);
+                if (!loginBo.isLogin(username, password)) {
+                    showLoginForm(request, response);
+                } else {
+                    showInsertForm(request, response);
+                }
                 break;
             case "update":
-                showUpdateForm(request, response);
+                if (!loginBo.isLogin(username, password)) {
+                    showLoginForm(request, response);
+                } else {
+                    showUpdateForm(request, response);
+                }
                 break;
             case "delete":
-                deleteProduct(request, response);
+                if (!loginBo.isLogin(username, password)) {
+                    showLoginForm(request, response);
+                } else {
+                    deleteProduct(request, response);
+                }
                 break;
             case "login":
                 showLoginForm(request, response);
@@ -79,6 +93,7 @@ public class ProductServlet extends HttpServlet {
     @Override
     protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
         response.setContentType("text/html;charset=UTF-8");
+        request.setCharacterEncoding("utf-8");
         String action = request.getParameter("action");
         System.out.println(action);
         if (action == null) {
@@ -91,13 +106,15 @@ public class ProductServlet extends HttpServlet {
             case "update":
                 updateProduct(request, response);
                 break;
-
+            case "search":
+                searchProductByName(request, response);
+                break;
             default:
                 showHome(request, response);
         }
     }
 
-    public void showProductList(HttpServletRequest request, HttpServletResponse response) throws IOException, ServletException{
+    public void showProductList(HttpServletRequest request, HttpServletResponse response) throws IOException, ServletException {
         List<ProductEntity> pList = productBO.getAllProduct();
         request.setAttribute("products", pList);
         request.getRequestDispatcher("/product_list.jsp").forward(request, response);
@@ -111,6 +128,7 @@ public class ProductServlet extends HttpServlet {
 
     public void showUpdateForm(HttpServletRequest request, HttpServletResponse response) throws IOException, ServletException {
         String pId = request.getParameter("pId");
+        System.out.println("pId" + pId);
         ProductEntity product = productBO.getProductById(pId);
         request.setAttribute("pId", pId);
         request.setAttribute("name", product.getName());
@@ -148,15 +166,23 @@ public class ProductServlet extends HttpServlet {
         String cId = request.getParameter("cId");
 
         String uploadFolder = request.getServletContext().getRealPath("/uploads");
-        Path uploadPath = Paths.get(uploadFolder);
-        if (!Files.exists(uploadPath)) {
-            Files.createDirectory(uploadPath);
-        }
-        Part imagePart = request.getPart("image");
-        String imageFilename = imagePart.getSubmittedFileName().toString();
+        Path uploadPath = Paths.get(uploadFolder);//folder uploads
 
-        imagePart.write(Paths.get(uploadPath.toString(), imageFilename.toString()).toString());
-        String imagePath = "/uploads/" + imageFilename;
+
+        if (!Files.exists(uploadPath)) {
+            Files.createDirectory(uploadPath); //tự tạo
+        }
+        String imagePath = null;
+//        if(request.getPart("image")!=null)
+//        {
+//            System.out.println("24h");
+//            Part imagePart = request.getPart("image");
+//            String imageFilename = imagePart.getSubmittedFileName().toString();
+//
+//            imagePart.write(Paths.get(uploadPath.toString(), imageFilename.toString()).toString());
+//            imagePath = "/uploads/" + imageFilename;
+//
+//        }
 
         ProductEntity product = new ProductEntity(pId, name, cId, imagePath, price, description);
         productBO.addProduct(product);
@@ -194,6 +220,14 @@ public class ProductServlet extends HttpServlet {
 
     }
 
+    public void searchProductByName(HttpServletRequest request, HttpServletResponse response) throws IOException, ServletException {
+        String name = request.getParameter("keyword");
+        List<ProductEntity> productList = productBO.searchProductsByName(name);
+        request.setAttribute("pList", productList);
+        request.getRequestDispatcher("/home.jsp").forward(request, response);
+
+    }
+
     public void showHome(HttpServletRequest request, HttpServletResponse response) throws IOException, ServletException {
         List<CategoryEntity> cList = productBO.getAllCategory();
         List<ProductEntity> pList = productBO.getAllProduct();
@@ -206,14 +240,15 @@ public class ProductServlet extends HttpServlet {
     }
 
     public void showLoginForm(HttpServletRequest request, HttpServletResponse response) throws IOException, ServletException {
-        request.getRequestDispatcher("/login.jsp").forward(request, response);
+        //  request.getRequestDispatcher("/login.jsp").forward(request, response);
+        response.sendRedirect("/login.jsp");
     }
 
     public void logout(HttpServletRequest request, HttpServletResponse response) throws IOException, ServletException {
         HttpSession session = request.getSession();
 //        session.invalidate();
-        session.setAttribute("username",null);
-        session.setAttribute("password",null);
+        session.setAttribute("username", null);
+        session.setAttribute("password", null);
         response.sendRedirect("/home");
         return; // <--- Here.
     }
