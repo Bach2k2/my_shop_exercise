@@ -124,5 +124,25 @@ public class ProductDao {
             throw new RuntimeException(e);
         }
     }
+    public List<ProductEntity> searchProductsByName(String name) {
+        List<ProductEntity> products = new ArrayList<>();
+        try {
+            PreparedStatement preparedStatement = conn.prepareStatement("SELECT * FROM product where name LIKE  CONCAT( '%',?,'%')");
+            preparedStatement.setString(1,name);
+            ResultSet rs = preparedStatement.executeQuery();
+            while (rs.next()) {
+                String pId = rs.getString("product_id");
+                String pName = rs.getString("name");
+                String cId = rs.getString("category_id");
+                String image = rs.getString("image");
+                Double price = rs.getDouble("price");
+                ProductEntity product = new ProductEntity(pId, pName, cId, image, price);
+                products.add(product);
+            }
+            return products;
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
 
 }
